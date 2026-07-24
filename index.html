@@ -1,0 +1,539 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Studify - Main App</title>
+
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+    <style>
+        :root {
+            --primary: #4f46e5;
+            --primary-hover: #4338ca;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --text: #0f172a;
+            --text-muted: #64748b;
+            --border: #e2e8f0;
+            --success: #16a34a;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
+        body { background-color: var(--bg); color: var(--text); display: flex; flex-direction: column; min-height: 100vh; }
+
+        header {
+            background: var(--card-bg); border-bottom: 1px solid var(--border);
+            padding: 1rem 2rem; display: flex; justify-content: space-between; align-items: center;
+            position: sticky; top: 0; z-index: 100;
+        }
+
+        .logo { font-size: 1.5rem; font-weight: 700; color: var(--primary); }
+
+        button { padding: 0.5rem 1rem; border-radius: 0.5rem; border: none; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .btn-primary { background: var(--primary); color: white; }
+        .btn-primary:hover { background: var(--primary-hover); }
+        .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+
+        .container { max-width: 1200px; margin: 2rem auto; padding: 0 1rem; width: 100%; flex: 1; }
+
+        .class-selector { display: flex; gap: 0.5rem; overflow-x: auto; padding-bottom: 1rem; margin-bottom: 1.5rem; }
+        .class-btn { background: var(--card-bg); border: 1px solid var(--border); padding: 0.6rem 1.4rem; white-space: nowrap; font-size: 0.95rem; }
+        .class-btn.active { background: var(--primary); color: white; border-color: var(--primary); }
+
+        .nav-tabs { display: flex; gap: 1rem; margin-bottom: 1.5rem; border-bottom: 2px solid var(--border); }
+        .tab-btn { background: none; border: none; border-bottom: 3px solid transparent; padding: 0.75rem 1rem; font-size: 1rem; border-radius: 0; color: var(--text-muted); }
+        .tab-btn.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+        .main-layout { display: grid; grid-template-columns: 1fr; gap: 2rem; }
+        @media (min-width: 768px) { .main-layout { grid-template-columns: 2fr 1fr; } }
+
+        .video-player-container { background: #000; border-radius: 0.75rem; overflow: hidden; aspect-ratio: 16/9; position: relative; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1); }
+        .video-player-container iframe, .video-player-container video { width: 100%; height: 100%; border: none; display: block; }
+
+        .video-placeholder { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100%; color: white; text-align: center; padding: 2rem; background: #1e293b; }
+
+        .video-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1.5rem; }
+        .video-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 0.5rem; overflow: hidden; cursor: pointer; position: relative; display: flex; flex-direction: column; }
+        .thumbnail-mock { background: #cbd5e1; aspect-ratio: 16/9; display: flex; align-items: center; justify-content: center; font-weight: bold; color: var(--text-muted); }
+        .video-info { padding: 1rem; flex: 1; display: flex; flex-direction: column; justify-content: space-between; }
+        .video-title { font-weight: 600; font-size: 0.95rem; }
+
+        .quiz-card { background: var(--card-bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 1.5rem; margin-bottom: 1.5rem; }
+        .quiz-option { display: block; width: 100%; text-align: left; padding: 0.75rem; margin: 0.5rem 0; border: 1px solid var(--border); background: var(--bg); border-radius: 0.375rem; font-size: 0.95rem; cursor: pointer; }
+        .quiz-option:hover { border-color: var(--primary); background: #e0e7ff; }
+
+        .ai-container { background: var(--card-bg); border: 1px solid var(--border); border-radius: 0.75rem; display: flex; flex-direction: column; height: 550px; box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.05); }
+        .ai-chat-header { background: #4f46e5; color: white; padding: 1rem; font-weight: bold; border-top-left-radius: 0.75rem; border-top-right-radius: 0.75rem; display: flex; justify-content: space-between; }
+        .ai-chat-messages { flex: 1; padding: 1rem; overflow-y: auto; display: flex; flex-direction: column; gap: 0.75rem; background: #fafafa; }
+        .msg { max-width: 85%; padding: 0.75rem 1rem; border-radius: 0.5rem; line-height: 1.5; font-size: 0.95rem; }
+        .msg.user { background: #e0e7ff; color: #1e1b4b; align-self: flex-end; border-bottom-right-radius: 0; }
+        .msg.bot { background: white; color: var(--text); border: 1px solid var(--border); align-self: flex-start; border-bottom-left-radius: 0; white-space: pre-wrap; }
+        .ai-chat-input-bar { display: flex; border-top: 1px solid var(--border); padding: 0.5rem; background: white; border-bottom-left-radius: 0.75rem; border-bottom-right-radius: 0.75rem; }
+        .ai-input { flex: 1; border: none; padding: 0.75rem; outline: none; font-size: 0.95rem; }
+
+        .admin-panel, .login-panel { display: none; background: var(--card-bg); border: 1px solid var(--border); border-radius: 0.75rem; padding: 2rem; margin-top: 1rem; }
+        .login-panel { max-width: 400px; margin: 4rem auto; }
+        .form-group { margin-bottom: 1.25rem; }
+        .form-group label { display: block; margin-bottom: 0.5rem; font-weight: 600; }
+        .form-control { width: 100%; padding: 0.6rem; border: 1px solid var(--border); border-radius: 0.375rem; font-size: 1rem; }
+        .admin-table { width: 100%; border-collapse: collapse; margin-top: 2rem; }
+        .admin-table th, .admin-table td { border: 1px solid var(--border); padding: 0.75rem; text-align: left; }
+        .admin-table th { background: var(--bg); }
+
+        .ad-modal-overlay { position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0, 0, 0, 0.85); display: none; justify-content: center; align-items: center; z-index: 1000; }
+        .ad-modal-content { background: white; padding: 2.5rem 2rem; border-radius: 0.75rem; max-width: 480px; width: 90%; text-align: center; box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.3); }
+        .ad-instruction-box { background: #f1f5f9; border: 1px solid #cbd5e1; border-radius: 0.5rem; padding: 1.25rem; margin: 1.25rem 0; color: #334155; font-size: 0.95rem; line-height: 1.5; }
+        .btn-watch-ad { display: inline-block; background-color: #2563eb; color: white; text-decoration: none; font-weight: 600; font-size: 1.05rem; padding: 0.85rem 1.75rem; border-radius: 0.5rem; width: 100%; text-align: center; }
+        .btn-watch-ad:hover { background-color: #1d4ed8; }
+        .btn-close-modal { margin-top: 0.75rem; background: transparent; color: var(--text-muted); border: none; font-size: 0.9rem; cursor: pointer; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="logo">Studify <span style="font-size: 0.9rem; font-weight: normal; color: var(--text-muted);">(CBSE Maths)</span></div>
+        <div class="nav-actions">
+            <button id="adminToggleBtn" class="btn-primary" onclick="handleAdminNavClick()">Admin Dashboard</button>
+        </div>
+    </header>
+
+    <div class="container" id="userView">
+        <h2 style="margin-bottom: 1rem;">Select Class:</h2>
+        <div class="class-selector" id="classSelector"></div>
+
+        <div class="nav-tabs">
+            <button class="tab-btn active" id="tabVideosBtn" onclick="switchTab('videos')">📺 Video Lessons</button>
+            <button class="tab-btn" id="tabQuizBtn" onclick="switchTab('quiz')">📝 Practice & Quizzes</button>
+            <button class="tab-btn" id="tabAiBtn" onclick="switchTab('ai')">🤖 Studify AI Tutor</button>
+        </div>
+
+        <div id="videosSection">
+            <div class="main-layout">
+                <div>
+                    <div class="video-player-container">
+                        <div id="videoPlayerPlaceholder" class="video-placeholder">
+                            <h2>Welcome to Studify</h2>
+                            <p style="margin-top: 0.5rem;">Select any math lesson from the list to start watching in-app.</p>
+                        </div>
+                        <div id="playerFrameContainer" style="display: none; width:100%; height:100%;"></div>
+                    </div>
+                    <h2 id="nowPlayingTitle" style="margin-top: 1rem; font-size: 1.25rem;"></h2>
+                </div>
+                <div>
+                    <h3 style="margin-bottom: 1rem;">Available Lessons</h3>
+                    <div class="video-grid" id="videoContainer"></div>
+                </div>
+            </div>
+        </div>
+
+        <div id="quizSection" style="display: none;">
+            <div id="quizContainer"></div>
+        </div>
+
+        <div id="aiSection" style="display: none; max-width: 900px; margin: 0 auto;">
+            <div class="ai-container">
+                <div class="ai-chat-header">
+                    <span>🤖 Studify AI Smart Math Tutor</span>
+                    <span id="aiActiveScope" style="font-size: 0.85rem; font-weight: normal; background: rgba(255,255,255,0.2); padding: 0.2rem 0.5rem; border-radius: 0.25rem;">Class 8 Scope Active</span>
+                </div>
+                <div class="ai-chat-messages" id="aiChatBox">
+                    <div class="msg bot" id="aiWelcomeMessage">Loading tutor details...</div>
+                </div>
+                <div class="ai-chat-input-bar">
+                    <input type="text" id="aiUserMsg" class="ai-input" placeholder="Type a concept name or ask a math problem here..." onkeypress="if(event.key==='Enter') sendAiMessage()">
+                    <button class="btn-primary" onclick="sendAiMessage()">Ask AI</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="ad-modal-overlay" id="adModal">
+        <div class="ad-modal-content">
+            <h3 style="font-size: 1.35rem;">🎬 Watch Video Lesson</h3>
+            <div class="ad-instruction-box">
+                Watch the short ad and do the steps to watch the content.
+            </div>
+            <a href="https://gplinks.co/thanks2" class="btn-watch-ad" target="_blank" onclick="unlockVideo()">
+                Watch the video &rarr;
+            </a>
+            <div>
+                <button class="btn-close-modal" onclick="closeAdModal()">Cancel</button>
+            </div>
+        </div>
+    </div>
+
+    <div class="container login-panel" id="loginPanel">
+        <h2 style="margin-bottom: 1rem; text-align: center;">Admin Security Access</h2>
+        <div id="loginError" style="color: red; margin-bottom: 1rem; display: none; text-align: center;">Invalid Credentials!</div>
+        <form onsubmit="tryAdminLogin(event)">
+            <div class="form-group">
+                <label>Admin Username</label>
+                <input type="text" id="adminUser" class="form-control" required placeholder="Studify">
+            </div>
+            <div class="form-group">
+                <label>Admin Password</label>
+                <input type="password" id="adminPass" class="form-control" required placeholder="Study">
+            </div>
+            <button type="submit" class="btn-primary" style="width: 100%; padding: 0.75rem;">Verify & Authenticate</button>
+            <button type="button" class="btn-outline" style="width: 100%; margin-top: 0.5rem;" onclick="showUserView()">Cancel</button>
+        </form>
+    </div>
+
+    <div class="container admin-panel" id="adminPanel">
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h2>Admin Video Upload Dashboard</h2>
+            <div>
+                <button class="btn-outline" style="color: #ef4444; border-color: #fca5a5; margin-right: 0.5rem;" onclick="adminLogout()">Log Out</button>
+                <button class="btn-primary" onclick="showUserView()">View Main App</button>
+            </div>
+        </div>
+
+        <form id="videoForm" onsubmit="saveNewVideo(event)">
+            <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                <div class="form-group">
+                    <label>Video Title</label>
+                    <input type="text" id="vidTitle" class="form-control" placeholder="e.g., Rational Numbers Class 8" required>
+                </div>
+                <div class="form-group">
+                    <label>Target Class (CBSE Maths)</label>
+                    <select id="vidClass" class="form-control" required>
+                        <option value="1">Class 1</option>
+                        <option value="2">Class 2</option>
+                        <option value="3">Class 3</option>
+                        <option value="4">Class 4</option>
+                        <option value="5">Class 5</option>
+                        <option value="6">Class 6</option>
+                        <option value="7">Class 7</option>
+                        <option value="8">Class 8</option>
+                        <option value="9">Class 9</option>
+                    </select>
+                </div>
+            </div>
+
+            <div class="form-group">
+                <label>Video Source Type</label>
+                <select id="vidSourceType" class="form-control" onchange="toggleSourceInputs()" required>
+                    <option value="youtube">YouTube Embed Link</option>
+                    <option value="local">Upload Existing Video File (.mp4 / .webm)</option>
+                </select>
+            </div>
+
+            <div class="form-group" id="youtubeInputGroup">
+                <label>YouTube Link or Video URL</label>
+                <input type="text" id="vidUrl" class="form-control" placeholder="https://www.youtube.com/embed/XXXXXX">
+            </div>
+
+            <div class="form-group" id="localInputGroup" style="display: none;">
+                <label>Select Video File from Computer/Phone</label>
+                <input type="file" id="vidFile" class="form-control" accept="video/mp4,video/webm">
+            </div>
+
+            <button type="submit" id="submitBtn" class="btn-primary" style="width: 100%; padding: 0.75rem;">Upload & Publish Globally</button>
+        </form>
+
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Class</th>
+                    <th>Title</th>
+                    <th>Type</th>
+                    <th>Action</th>
+                </tr>
+            </thead>
+            <tbody id="adminTableBody"></tbody>
+        </table>
+    </div>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyA2SGo7fUetUf4YhPDEgU5_JdsMv0dmxUg",
+            authDomain: "studify-app-1064e.firebaseapp.com",
+            projectId: "studify-app-1064e",
+            storageBucket: "studify-app-1064e.firebasestorage.app",
+            messagingSenderId: "803440615870",
+            appId: "1:803440615870:web:48059e0ff14b00cb1419ef",
+            databaseURL: "https://studify-app-1064e-default-rtdb.firebaseio.com"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+
+        const cbseMathsCurriculum = {
+            "1": { chapters: ["Shapes and Space", "Numbers One to Nine", "Addition", "Subtraction", "Money"], explanations: "Welcome to Class 1 Foundation! Addition, Subtraction, Shapes, and Counting." },
+            "2": { chapters: ["Counting in Groups", "How Much Can You Carry?", "Counting in Tens", "Tens and Ones"], explanations: "Welcome to Class 2 Math! Two-digit numbers, place value, and patterns." },
+            "3": { chapters: ["Fun with Numbers", "Give and Take", "Long and Short", "Time Goes On"], explanations: "Welcome to Class 3 Math! Multiplication tables, 3-digit operations, and weights." },
+            "4": { chapters: ["Building with Bricks", "Tick-Tick-Tick", "Halves and Quarters"], explanations: "Welcome to Class 4 Math! Fractions, clock reading, and perimeter." },
+            "5": { chapters: ["The Fish Tale", "Shapes and Angles", "Factors and Multiples", "Decimals"], explanations: "Welcome to Class 5! LCM, HCF, Angles, and Area." },
+            "6": { chapters: ["Knowing Our Numbers", "Integers", "Fractions", "Algebra", "Ratio"], explanations: "Welcome to Class 6! Negative numbers and algebra basics." },
+            "7": { chapters: ["Integers", "Simple Equations", "Triangle Properties", "Rational Numbers"], explanations: "Welcome to Class 7 Math! Simple linear equations and triangle properties." },
+            "8": { chapters: ["Rational Numbers", "Linear Equations", "Square Roots", "Algebraic Expressions"], explanations: "Welcome to Class 8! Algebraic identities, exponents, and equations." },
+            "9": { chapters: ["Number Systems", "Polynomials", "Linear Equations", "Heron's Formula"], explanations: "Welcome to Class 9 High School Math! Polynomials and Heron's formula." }
+        };
+
+        const sampleQuizzes = {
+            "8": [
+                { q: "1. What is the additive inverse of 2/8?", options: ["-2/8", "8/2", "2/8", "-8/2"], ans: 0 },
+                { q: "2. Which of the following is a rational number?", options: ["0", "5", "2/3", "All of these"], ans: 3 }
+            ]
+        };
+
+        let videos = [];
+        let isAdminLoggedIn = false;
+        let selectedClass = "8";
+        let clickedVidId = null;
+
+        window.onload = function() {
+            renderClassSelectors();
+            syncFirebaseData();
+            renderQuiz();
+            updateAiWelcomeMessage();
+            checkAutoPlay();
+        };
+
+        function syncFirebaseData() {
+            db.ref('videos').on('value', (snapshot) => {
+                const data = snapshot.val();
+                videos = [];
+                if (data) {
+                    Object.keys(data).forEach(key => {
+                        videos.push({ firebaseKey: key, ...data[key] });
+                    });
+                }
+                renderUserVideos();
+                renderAdminTable();
+            });
+        }
+
+        function toggleSourceInputs() {
+            const type = document.getElementById('vidSourceType').value;
+            document.getElementById('youtubeInputGroup').style.display = type === 'youtube' ? 'block' : 'none';
+            document.getElementById('localInputGroup').style.display = type === 'local' ? 'block' : 'none';
+        }
+
+        function switchTab(tab) {
+            document.getElementById('videosSection').style.display = tab === 'videos' ? 'block' : 'none';
+            document.getElementById('quizSection').style.display = tab === 'quiz' ? 'block' : 'none';
+            document.getElementById('aiSection').style.display = tab === 'ai' ? 'block' : 'none';
+            document.getElementById('tabVideosBtn').className = `tab-btn ${tab === 'videos' ? 'active' : ''}`;
+            document.getElementById('tabQuizBtn').className = `tab-btn ${tab === 'quiz' ? 'active' : ''}`;
+            document.getElementById('tabAiBtn').className = `tab-btn ${tab === 'ai' ? 'active' : ''}`;
+        }
+
+        function renderClassSelectors() {
+            const container = document.getElementById('classSelector');
+            container.innerHTML = '';
+            for (let i = 1; i <= 9; i++) {
+                const btn = document.createElement('button');
+                btn.className = `class-btn ${selectedClass === String(i) ? 'active' : ''}`;
+                btn.innerText = `Class ${i}`;
+                btn.onclick = () => selectClass(String(i));
+                container.appendChild(btn);
+            }
+        }
+
+        function selectClass(classNum) {
+            selectedClass = classNum;
+            renderClassSelectors();
+            renderUserVideos();
+            renderQuiz();
+            updateAiWelcomeMessage();
+        }
+
+        function updateAiWelcomeMessage() {
+            document.getElementById('aiActiveScope').innerText = `Class ${selectedClass} Scope Active`;
+            const curriculum = cbseMathsCurriculum[selectedClass];
+            const welcomeMsg = `Welcome student! I am tuned directly into the **CBSE Class ${selectedClass} Maths Syllabus**.\n\n**Here are your available chapters:**\n• ` + curriculum.chapters.join('\n• ') + `\n\n${curriculum.explanations}\n\nAsk me any concept explanation or calculation formula from these chapters!`;
+            document.getElementById('aiWelcomeMessage').innerHTML = welcomeMsg.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+        }
+
+        function renderUserVideos() {
+            const container = document.getElementById('videoContainer');
+            container.innerHTML = '';
+            const filtered = videos.filter(v => String(v.class) === selectedClass);
+            if (filtered.length === 0) {
+                container.innerHTML = `<p style="color:var(--text-muted); padding: 1rem;">No lessons added yet for Class ${selectedClass}.</p>`;
+                return;
+            }
+            filtered.forEach(video => {
+                const card = document.createElement('div');
+                card.className = 'video-card';
+                card.onclick = () => promptAdModal(video.id);
+                card.innerHTML = `
+                    <div class="thumbnail-mock">Maths Class ${video.class}</div>
+                    <div class="video-info">
+                        <div class="video-title">${video.title}</div>
+                        <div style="font-size:0.8rem; color: var(--text-muted); margin-top:0.25rem;">▶ Play In-App</div>
+                    </div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function promptAdModal(id) {
+            clickedVidId = id;
+            document.getElementById('adModal').style.display = 'flex';
+        }
+
+        function closeModal() { document.getElementById('adModal').style.display = 'none'; }
+
+        function unlockVideo() {
+            localStorage.setItem('pending_unlocked_vid', clickedVidId);
+            closeModal();
+        }
+
+        function checkAutoPlay() {
+            const savedVidId = localStorage.getItem('pending_unlocked_vid');
+            if (savedVidId) {
+                const matchedVid = videos.find(v => String(v.id) === String(savedVidId));
+                if (matchedVid) {
+                    selectClass(String(matchedVid.class));
+                    startVideoPlayback(matchedVid);
+                }
+                localStorage.removeItem('pending_unlocked_vid');
+            }
+        }
+
+        function renderQuiz() {
+            const container = document.getElementById('quizContainer');
+            container.innerHTML = '';
+            const quizList = sampleQuizzes[selectedClass] || [];
+            if (quizList.length === 0) {
+                container.innerHTML = `<p style="color:var(--text-muted); padding:1rem;">No practice quizzes available for Class ${selectedClass}.</p>`;
+                return;
+            }
+            quizList.forEach((qObj, idx) => {
+                const card = document.createElement('div');
+                card.className = 'quiz-card';
+                let optionsHTML = '';
+                qObj.options.forEach((opt, optIdx) => {
+                    optionsHTML += `<button class="quiz-option" onclick="checkAnswer(${idx}, ${optIdx}, ${qObj.ans})">${opt}</button>`;
+                });
+                card.innerHTML = `<h3>${qObj.q}</h3><div style="margin-top:1rem;">${optionsHTML}</div><div id="quizResult${idx}" style="margin-top:0.5rem; font-weight:bold;"></div>`;
+                container.appendChild(card);
+            });
+        }
+
+        function checkAnswer(qIdx, selectedOpt, correctOpt) {
+            const resultDiv = document.getElementById(`quizResult${qIdx}`);
+            if (selectedOpt === correctOpt) {
+                resultDiv.style.color = "var(--success)"; resultDiv.innerText = "✅ Correct Answer!";
+            } else {
+                resultDiv.style.color = "#ef4444"; resultDiv.innerText = "❌ Incorrect. Try again!";
+            }
+        }
+
+        function startVideoPlayback(video) {
+            const placeholder = document.getElementById('videoPlayerPlaceholder');
+            const frameContainer = document.getElementById('playerFrameContainer');
+            const nowPlayingTitle = document.getElementById('nowPlayingTitle');
+            placeholder.style.display = 'none';
+            frameContainer.style.display = 'block';
+            
+            if (video.source === 'youtube') {
+                let embedUrl = video.url;
+                if(embedUrl.includes('watch?v=')) embedUrl = embedUrl.replace('watch?v=', 'embed/');
+                frameContainer.innerHTML = `<iframe src="${embedUrl}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
+            } else {
+                frameContainer.innerHTML = `<video src="${video.url}" controls autoplay style="width:100%; height:100%;"></video>`;
+            }
+            nowPlayingTitle.innerText = `Now Playing: ${video.title}`;
+        }
+
+        function sendAiMessage() {
+            const inputEl = document.getElementById('aiUserMsg');
+            const query = inputEl.value.trim();
+            if(!query) return;
+
+            const chatBox = document.getElementById('aiChatBox');
+            const userMsg = document.createElement('div');
+            userMsg.className = 'msg user';
+            userMsg.innerText = query;
+            chatBox.appendChild(userMsg);
+            inputEl.value = '';
+
+            const lowerQuery = query.toLowerCase();
+            let aiResponse = `🤖 **Class ${selectedClass} Mathematics Response:**\n\n`;
+
+            if (lowerQuery.includes('rational')) {
+                aiResponse += "📝 **Rational Numbers:** Any number expressible as p/q where q ≠ 0.";
+            } else if (lowerQuery.includes('equation')) {
+                aiResponse += "📝 **Linear Equations:** Isolating variables using algebraic principles.";
+            } else if (lowerQuery.includes('area') || lowerQuery.includes('formula')) {
+                aiResponse += "📐 **Formula Reference:** Area of rectangle = length × breadth | Area of Triangle = ½ × base × height.";
+            } else {
+                aiResponse += `I'm analyzing your query for Class ${selectedClass}. Write down given values, identify the appropriate formula, and evaluate step-by-step.`;
+            }
+
+            setTimeout(() => {
+                const botMsg = document.createElement('div');
+                botMsg.className = 'msg bot';
+                botMsg.innerHTML = aiResponse.replace(/\n/g, '<br>').replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>');
+                chatBox.appendChild(botMsg);
+                chatBox.scrollTop = chatBox.scrollHeight;
+            }, 300);
+        }
+
+        function handleAdminNavClick() { if (isAdminLoggedIn) showAdminDashboard(); else showLoginGate(); }
+        function showLoginGate() { document.getElementById('userView').style.display = 'none'; document.getElementById('adminPanel').style.display = 'none'; document.getElementById('loginPanel').style.display = 'block'; }
+        function tryAdminLogin(e) { e.preventDefault(); if (document.getElementById('adminUser').value === "Studify" && document.getElementById('adminPass').value === "Study") { isAdminLoggedIn = true; showAdminDashboard(); } else { document.getElementById('loginError').style.display = 'block'; } }
+        function showAdminDashboard() { document.getElementById('userView').style.display = 'none'; document.getElementById('loginPanel').style.display = 'none'; document.getElementById('adminPanel').style.display = 'block'; renderAdminTable(); }
+        function showUserView() { document.getElementById('loginPanel').style.display = 'none'; document.getElementById('adminPanel').style.display = 'none'; document.getElementById('userView').style.display = 'block'; }
+        function adminLogout() { isAdminLoggedIn = false; showUserView(); }
+
+        function saveNewVideo(e) {
+            e.preventDefault();
+            const title = document.getElementById('vidTitle').value;
+            const classVal = document.getElementById('vidClass').value;
+            const source = document.getElementById('vidSourceType').value;
+            const submitBtn = document.getElementById('submitBtn');
+
+            if (source === 'youtube') {
+                const url = document.getElementById('vidUrl').value;
+                publishVideoRecord({ id: Date.now(), title, class: classVal, source, url });
+            } else {
+                const fileInput = document.getElementById('vidFile');
+                if (fileInput.files.length === 0) return alert("Please select a video file!");
+                
+                submitBtn.disabled = true;
+                submitBtn.innerText = "Encoding File...";
+                
+                const reader = new FileReader();
+                reader.onload = function(evt) {
+                    publishVideoRecord({ id: Date.now(), title, class: classVal, source, url: evt.target.result });
+                };
+                reader.readAsDataURL(fileInput.files[0]);
+            }
+        }
+
+        function publishVideoRecord(videoData) {
+            const submitBtn = document.getElementById('submitBtn');
+            db.ref('videos').push(videoData, (error) => {
+                submitBtn.disabled = false;
+                submitBtn.innerText = "Upload & Publish Globally";
+                if (error) alert("Error publishing: " + error.message);
+                else {
+                    alert("Published globally to all users!");
+                    document.getElementById('videoForm').reset();
+                    toggleSourceInputs();
+                    showUserView();
+                }
+            });
+        }
+
+        function deleteVideo(key) {
+            if(confirm("Delete this lesson globally for all users?")) {
+                db.ref('videos/' + key).remove();
+            }
+        }
+
+        function renderAdminTable() {
+            const tbody = document.getElementById('adminTableBody');
+            tbody.innerHTML = '';
+            videos.forEach(v => {
+                tbody.innerHTML += `<tr><td><strong>Class ${v.class}</strong></td><td>${v.title}</td><td>${(v.source || 'youtube').toUpperCase()}</td><td><button class="btn-outline" style="color:red;" onclick="deleteVideo('${v.firebaseKey}')">Delete</button></td></tr>`;
+            });
+        }
+    </script>
+</body>
+</html>
