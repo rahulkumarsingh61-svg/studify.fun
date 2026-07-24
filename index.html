@@ -155,7 +155,7 @@
             <div class="ad-instruction-box">
                 Watch the short ad and do the steps to watch the content.
             </div>
-            <a href="https://gplinks.co/thanks2" class="btn-watch-ad" target="_blank" onclick="unlockVideo()">
+            <a href="https://gplinks.co/qtJj881" class="btn-watch-ad" target="_blank" onclick="unlockVideo()">
                 Watch the video &rarr;
             </a>
             <div>
@@ -375,11 +375,12 @@
             document.getElementById('adModal').style.display = 'flex';
         }
 
-        function closeModal() { document.getElementById('adModal').style.display = 'none'; }
+        function closeAdModal() { document.getElementById('adModal').style.display = 'none'; }
 
+        // Core dynamic validation flag checking
         function unlockVideo() {
             localStorage.setItem('pending_unlocked_vid', clickedVidId);
-            closeModal();
+            closeAdModal();
         }
 
         function checkAutoPlay() {
