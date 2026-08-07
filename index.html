@@ -155,7 +155,7 @@
             <div class="ad-instruction-box">
                 Watch the short ad and do the steps to watch the content.
             </div>
-            <a href="https://gplinks.co/qtJj881" class="btn-watch-ad" target="_blank" onclick="unlockVideo()">
+            <a href="https://vplink.in/THANKS" class="btn-watch-ad" target="_blank" onclick="unlockVideo()">
                 Watch the video &rarr;
             </a>
             <div>
@@ -215,19 +215,19 @@
             <div class="form-group">
                 <label>Video Source Type</label>
                 <select id="vidSourceType" class="form-control" onchange="toggleSourceInputs()" required>
-                    <option value="youtube">YouTube Embed Link</option>
-                    <option value="local">Upload Existing Video File (.mp4 / .webm)</option>
+                    <option value="youtube">YouTube Link / URL</option>
+                    <option value="local">Direct Video Link (.mp4 / file URL)</option>
                 </select>
             </div>
 
             <div class="form-group" id="youtubeInputGroup">
-                <label>YouTube Link or Video URL</label>
-                <input type="text" id="vidUrl" class="form-control" placeholder="https://www.youtube.com/embed/XXXXXX">
+                <label>YouTube Video Link</label>
+                <input type="text" id="vidUrl" class="form-control" placeholder="e.g., https://www.youtube.com/watch?v=XXXXXX or https://youtu.be/XXXXXX">
             </div>
 
             <div class="form-group" id="localInputGroup" style="display: none;">
-                <label>Select Video File from Computer/Phone</label>
-                <input type="file" id="vidFile" class="form-control" accept="video/mp4,video/webm">
+                <label>Direct Video File URL (.mp4)</label>
+                <input type="text" id="vidFileUrl" class="form-control" placeholder="https://example.com/video.mp4">
             </div>
 
             <button type="submit" id="submitBtn" class="btn-primary" style="width: 100%; padding: 0.75rem;">Upload & Publish Globally</button>
@@ -306,6 +306,17 @@
             });
         }
 
+        // AUTO-CONVERTS ANY YOUTUBE LINK TO AN EMBEDDABLE LINK
+        function parseYouTubeUrl(url) {
+            if (!url) return '';
+            const regExp = /^.*(youtu.be\/|v\/|u\/\w\/|embed\/|shorts\/|watch\?v=|\&v=)([^#\&\?]*).*/;
+            const match = url.trim().match(regExp);
+            if (match && match[2].length === 11) {
+                return `https://www.youtube.com/embed/${match[2]}`;
+            }
+            return url.trim();
+        }
+
         function toggleSourceInputs() {
             const type = document.getElementById('vidSourceType').value;
             document.getElementById('youtubeInputGroup').style.display = type === 'youtube' ? 'block' : 'none';
@@ -377,7 +388,6 @@
 
         function closeAdModal() { document.getElementById('adModal').style.display = 'none'; }
 
-        // Core dynamic validation flag checking
         function unlockVideo() {
             localStorage.setItem('pending_unlocked_vid', clickedVidId);
             closeAdModal();
@@ -432,8 +442,7 @@
             frameContainer.style.display = 'block';
             
             if (video.source === 'youtube') {
-                let embedUrl = video.url;
-                if(embedUrl.includes('watch?v=')) embedUrl = embedUrl.replace('watch?v=', 'embed/');
+                const embedUrl = parseYouTubeUrl(video.url);
                 frameContainer.innerHTML = `<iframe src="${embedUrl}?autoplay=1" allow="autoplay; encrypted-media" allowfullscreen></iframe>`;
             } else {
                 frameContainer.innerHTML = `<video src="${video.url}" controls autoplay style="width:100%; height:100%;"></video>`;
@@ -484,36 +493,40 @@
 
         function saveNewVideo(e) {
             e.preventDefault();
-            const title = document.getElementById('vidTitle').value;
+            const title = document.getElementById('vidTitle').value.trim();
             const classVal = document.getElementById('vidClass').value;
             const source = document.getElementById('vidSourceType').value;
             const submitBtn = document.getElementById('submitBtn');
 
             if (source === 'youtube') {
-                const url = document.getElementById('vidUrl').value;
-                publishVideoRecord({ id: Date.now(), title, class: classVal, source, url });
+                const rawUrl = document.getElementById('vidUrl').value.trim();
+                if (!rawUrl) {
+                    alert("Please enter a YouTube video URL!");
+                    return;
+                }
+                const formattedUrl = parseYouTubeUrl(rawUrl);
+                publishVideoRecord({ id: Date.now(), title, class: classVal, source, url: formattedUrl });
             } else {
-                const fileInput = document.getElementById('vidFile');
-                if (fileInput.files.length === 0) return alert("Please select a video file!");
-                
-                submitBtn.disabled = true;
-                submitBtn.innerText = "Encoding File...";
-                
-                const reader = new FileReader();
-                reader.onload = function(evt) {
-                    publishVideoRecord({ id: Date.now(), title, class: classVal, source, url: evt.target.result });
-                };
-                reader.readAsDataURL(fileInput.files[0]);
+                const fileUrl = document.getElementById('vidFileUrl').value.trim();
+                if (!fileUrl) {
+                    alert("Please enter a direct video file link!");
+                    return;
+                }
+                publishVideoRecord({ id: Date.now(), title, class: classVal, source, url: fileUrl });
             }
         }
 
         function publishVideoRecord(videoData) {
             const submitBtn = document.getElementById('submitBtn');
+            submitBtn.disabled = true;
+            submitBtn.innerText = "Publishing...";
+
             db.ref('videos').push(videoData, (error) => {
                 submitBtn.disabled = false;
                 submitBtn.innerText = "Upload & Publish Globally";
-                if (error) alert("Error publishing: " + error.message);
-                else {
+                if (error) {
+                    alert("Error publishing: " + error.message);
+                } else {
                     alert("Published globally to all users!");
                     document.getElementById('videoForm').reset();
                     toggleSourceInputs();
